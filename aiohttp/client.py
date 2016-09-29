@@ -6,10 +6,10 @@ import hashlib
 import os
 import sys
 import traceback
-import urllib.parse
 import warnings
 
 from multidict import CIMultiDict, MultiDict, MultiDictProxy, istr
+from yarl import URL
 
 import aiohttp
 
@@ -17,8 +17,9 @@ from . import hdrs, helpers
 from ._ws_impl import WS_KEY, WebSocketParser, WebSocketWriter
 from .client_reqrep import ClientRequest, ClientResponse
 from .client_ws import ClientWebSocketResponse
+from .cookiejar import CookieJar
 from .errors import WSServerHandshakeError
-from .helpers import CookieJar, Timeout
+from .helpers import Timeout
 
 __all__ = ('ClientSession', 'request', 'get', 'options', 'head',
            'delete', 'post', 'put', 'patch', 'ws_connect')
@@ -179,7 +180,11 @@ class ClientSession:
             for i in skip_auto_headers:
                 skip_headers.add(istr(i))
 
+        if isinstance(proxy, str):
+            proxy = URL(proxy)
+
         while True:
+            url = URL(url).with_fragment(None)
 
             cookies = self._cookie_jar.filter_cookies(url)
 
@@ -235,15 +240,15 @@ class ClientSession:
                     if headers.get(hdrs.CONTENT_LENGTH):
                         headers.pop(hdrs.CONTENT_LENGTH)
 
-                r_url = (resp.headers.get(hdrs.LOCATION) or
-                         resp.headers.get(hdrs.URI))
+                r_url = URL(resp.headers.get(hdrs.LOCATION) or
+                            resp.headers.get(hdrs.URI))
 
-                scheme = urllib.parse.urlsplit(r_url)[0]
+                scheme = r_url.scheme
                 if scheme not in ('http', 'https', ''):
                     resp.close()
                     raise ValueError('Can redirect only to http or https')
                 elif not scheme:
-                    r_url = urllib.parse.urljoin(url, r_url)
+                    r_url = url.join(r_url)
 
                 url = r_url
                 params = None
@@ -467,14 +472,19 @@ class ClientSession:
         return self._connector
 
     @property
-    def cookies(self):
+    def cookie_jar(self):
         """The session cookies."""
-        return self._cookie_jar.cookies
+        return self._cookie_jar
 
     @property
     def version(self):
         """The session HTTP protocol version."""
         return self._version
+
+    @property
+    def loop(self):
+        """Session's loop."""
+        return self._loop
 
     def detach(self):
         """Detach connector from session without closing the former.

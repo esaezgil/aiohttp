@@ -19,7 +19,7 @@ accepts a :class:`Request` instance as its only parameter and returns a
    from aiohttp import web
 
    async def hello(request):
-       return web.Response(body=b"Hello, world")
+       return web.Response(text="Hello, world")
 
 Next, create an :class:`Application` instance and register the
 request handler with the application's :class:`router <UrlDispatcher>` on a
@@ -56,7 +56,7 @@ Command Line Interface (CLI)
 accepts a list of any non-parsed command-line arguments and returns an
 :class:`Application` instance after setting it up::
 
-    def init_function(argv):
+    def init_func(argv):
         app = web.Application()
         app.router.add_get("/", index_handler)
         return app
@@ -196,7 +196,7 @@ As discussed above, :ref:`handlers <aiohttp-web-handler>` can be first-class
 functions or coroutines::
 
    async def hello(request):
-       return web.Response(body=b"Hello, world")
+       return web.Response(text="Hello, world")
 
    app.router.add_get('/', hello)
 
@@ -212,7 +212,7 @@ application developers can organize handlers in classes if they so wish::
            pass
 
        def handle_intro(self, request):
-           return web.Response(body=b"Hello, world")
+           return web.Response(text="Hello, world")
 
        async def handle_greeting(self, request):
            name = request.match_info.get('name', "Anonymous")
@@ -414,7 +414,7 @@ third-party library, :mod:`aiohttp_session`, that adds *session* support::
         session = await get_session(request)
         last_visit = session['last_visit'] if 'last_visit' in session else None
         text = 'Last visited: {}'.format(last_visit)
-        return web.Response(body=text.encode('utf-8'))
+        return web.Response(text=text)
 
     def make_app():
         app = web.Application()
@@ -510,6 +510,7 @@ a container for the file as well as some of its metadata::
 
     async def store_mp3_handler(request):
 
+        # WARNING: don't do that if you plan to receive large files!
         data = await request.post()
 
         mp3 = data['mp3']
@@ -526,6 +527,35 @@ a container for the file as well as some of its metadata::
                             headers=MultiDict(
                                 {'CONTENT-DISPOSITION': mp3_file})
 
+
+You might be noticed a big warning in example above. The general issue is that
+:meth:`Request.post` reads whole payload in memory. That's may hurt with
+:abbr:`OOM (Out Of Memory)` error. To avoid this, for multipart uploads, you
+should use :meth:`Request.multipart` which returns :ref:`multipart reader
+<aiohttp-multipart>` back::
+
+    async def store_mp3_handler(request):
+
+        reader = await request.multipart()
+
+        # /!\ Don't forget to validate your inputs /!\
+
+        mp3 = await reader.next()
+
+        filename = mp3.filename
+
+        # You cannot relay on Content-Length if transfer is chunked.
+        size = 0
+        with open(os.path.join('/spool/yarrr-media/mp3/', filename), 'wb') as f:
+            while True:
+                chunk = await mp3.read_chunk()  # 8192 bytes by default.
+                if not chunk:
+                    break
+                size += len(chunk)
+                f.write(chunk)
+
+        return web.Response(text='{} sized of {} successfully stored'
+                                 ''.format(filename, size))
 
 .. _aiohttp-web-websockets:
 
@@ -948,7 +978,7 @@ Signal handler may look like::
 
     async def on_shutdown(app):
         for ws in app['websockets']:
-            await ws.close(code=999, message='Server shutdown')
+            await ws.close(code=WSCloseCode.GOING_AWAY, message='Server shutdown')
 
     app.on_shutdown.append(on_shutdown)
 
@@ -1088,3 +1118,4 @@ The toolbar is ready to use. Enjoy!!!
 
 
 .. disqus::
+  :title: aiohttp server usage

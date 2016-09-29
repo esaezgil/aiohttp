@@ -375,6 +375,45 @@ def test_drop_params_on_redirect(create_app_and_client):
 
 
 @asyncio.coroutine
+def test_drop_fragment_on_redirect(create_app_and_client):
+    @asyncio.coroutine
+    def handler_redirect(request):
+        return web.Response(status=301, headers={'Location': '/ok#fragment'})
+
+    @asyncio.coroutine
+    def handler_ok(request):
+        return web.Response(status=200)
+
+    app, client = yield from create_app_and_client()
+    app.router.add_route('GET', '/ok', handler_ok)
+    app.router.add_route('GET', '/redirect', handler_redirect)
+
+    resp = yield from client.get('/redirect')
+    try:
+        assert resp.status == 200
+        assert resp.url.path == '/ok'
+    finally:
+        yield from resp.release()
+
+
+@asyncio.coroutine
+def test_drop_fragment(create_app_and_client):
+    @asyncio.coroutine
+    def handler_ok(request):
+        return web.Response(status=200)
+
+    app, client = yield from create_app_and_client()
+    app.router.add_route('GET', '/ok', handler_ok)
+
+    resp = yield from client.get('/ok#fragment')
+    try:
+        assert resp.status == 200
+        assert resp.url.path == '/ok'
+    finally:
+        yield from resp.release()
+
+
+@asyncio.coroutine
 def test_history(create_app_and_client):
     @asyncio.coroutine
     def handler_redirect(request):
@@ -1449,7 +1488,8 @@ def test_set_cookies(test_client, loop):
     with mock.patch('aiohttp.client_reqrep.client_logger') as m_log:
         resp = yield from client.get('/')
         assert 200 == resp.status
-        assert client.session.cookies.keys() == {'c1', 'c2'}
+        cookie_names = {c.key for c in client.session.cookie_jar}
+        assert cookie_names == {'c1', 'c2'}
         resp.close()
 
         m_log.warning.assert_called_with('Can not load response cookies: %s',
@@ -1497,3 +1537,20 @@ def test_broken_connection_2(loop, test_client):
     with pytest.raises(aiohttp.ServerDisconnectedError):
         yield from resp.read()
     resp.close()
+
+
+@asyncio.coroutine
+def test_custom_headers(loop, test_client):
+    @asyncio.coroutine
+    def handler(request):
+        assert request.headers["x-api-key"] == "foo"
+        return web.Response()
+
+    app = web.Application(loop=loop)
+    app.router.add_post('/', handler)
+    client = yield from test_client(lambda loop: app)
+
+    resp = yield from client.post('/', headers={
+        "Content-Type": "application/json",
+        "x-api-key": "foo"})
+    assert resp.status == 200

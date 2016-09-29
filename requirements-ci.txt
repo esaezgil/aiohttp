@@ -1,13 +1,15 @@
 pip
 flake8
-pyflakes==1.1.0
+pyflakes
 coverage
+cchardet
 sphinx
-alabaster>=0.6.2
 cython
 chardet
-isort==4.2.5
+isort
 tox
+multidict
+async_timeout
 sphinxcontrib-asyncio
 sphinxcontrib-newsfeed
 pytest
@@ -18,4 +20,5 @@ gunicorn
 pygments>=2.1
 #aiodns  # Enable from .travis.yml as required c-ares will not build on windows
 twine
+yarl
 -e .

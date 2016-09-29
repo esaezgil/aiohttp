@@ -100,6 +100,11 @@ The client session supports the context manager protocol for self closing.
 
       .. versionadded:: 0.22
 
+   .. versionchanged:: 1.0
+
+      ``.cookies`` attribute was dropped. Use :attr:`cookie_jar`
+      instead.
+
    .. attribute:: closed
 
       ``True`` if the session has been closed, ``False`` otherwise.
@@ -113,13 +118,21 @@ The client session supports the context manager protocol for self closing.
 
       A read-only property.
 
-   .. attribute:: cookies
+   .. attribute:: cookie_jar
 
-      The session cookies, :class:`http.cookies.SimpleCookie` instance.
+      The session cookies, :class:`~aiohttp.AbstractCookieJar` instance.
 
-      A read-only property. Overriding `session.cookies = new_val` is
-      forbidden, but you may modify the object in-place if needed.
+      Gives access to cookie jar's content and modifiers.
 
+      A read-only property.
+
+      .. versionadded:: 1.0
+
+   .. attribute:: loop
+
+      A loop instance used for session creation.
+
+      A read-only property.
 
    .. comethod:: request(method, url, *, params=None, data=None,\
                          headers=None, skip_auto_headers=None, \
@@ -788,11 +801,12 @@ TCPConnector
 ^^^^^^^^^^^^
 
 .. class:: TCPConnector(*, verify_ssl=True, fingerprint=None,\
-                        use_dns_cache=False, \
+                        use_dns_cache=True, \
                         family=0, \
                         ssl_context=None, conn_timeout=None, \
                         keepalive_timeout=30, limit=None, \
-                        force_close=False, loop=None, local_addr=None)
+                        force_close=False, loop=None, local_addr=None,
+                        resolver=None)
 
    Connector for working with *HTTP* and *HTTPS* via *TCP* sockets.
 
@@ -816,7 +830,7 @@ TCPConnector
 
         .. versionadded:: 0.16
 
-   :param bool use_dns_cache: use internal cache for DNS lookups, ``False``
+   :param bool use_dns_cache: use internal cache for DNS lookups, ``True``
       by default.
 
       Enabling an option *may* speedup connection
@@ -825,14 +839,23 @@ TCPConnector
 
       .. versionadded:: 0.17
 
-   :param aiohttp.abc.AbstractResolver resolver: Custom resolver instance to use.
-      ``aiohttp.resolver.DefaultResolver`` by default.
+      .. versionchanged:: 1.0
 
-      Custom resolvers allow to resolve hostnames differently than the way the
-      host is configured. Alternate resolvers include aiodns, which does not rely
-      on a thread executor.
+         The default is changed to ``True``
+
+   :param aiohttp.abc.AbstractResolver resolver: Custom resolver
+      instance to use.  ``aiohttp.DefaultResolver`` by
+      default (asynchronous if ``aiodns>=1.1`` is installed).
+
+      Custom resolvers allow to resolve hostnames differently than the
+      way the host is configured.
 
       .. versionadded:: 0.22
+
+      .. versionchanged:: 1.0
+
+         The resolver is ``aiohttp.AsyncResolver`` now if
+         :term:`aiodns` is installed.
 
    :param bool resolve: alias for *use_dns_cache* parameter.
 
@@ -1112,7 +1135,13 @@ Response object
 
    .. attribute:: url
 
-      URL of request (:class:`str`).
+      URL of request (:class:`~yarl.URL`).
+
+      .. versionchanged:: 1.1
+
+      The attribute is :class:`~yarl.URL` now instead of :class:`str`.
+
+      For giving a string use ``str(resp.url)``.
 
    .. attribute:: connection
 
@@ -1389,27 +1418,55 @@ CookieJar
 
 .. class:: CookieJar(unsafe=False, loop=None)
 
+   The cookie jar instance is available as :attr:`ClientSession.cookie_jar`.
+
+   The jar contains :class:`~http.cookies.Morsel` items for storing
+   internal cookie data.
+
+   API provides a count of saved cookies::
+
+       len(session.cookie_jar)
+
+   These cookies may be iterated over::
+
+       for cookie in session.cookie_jar:
+           print(cookie.key)
+           print(cookie["domain"])
+
+   The class implements :class:`collections.abc.Iterable`,
+   :class:`collections.abc.Sized` and
+   :class:`aiohttp.AbstractCookieJar` interfaces.
+
    Implements cookie storage adhering to RFC 6265.
 
    :param bool unsafe: (optional) Whether to accept cookies from IPs.
+
    :param bool loop: an :ref:`event loop<asyncio-event-loop>` instance.
       See :class:`aiohttp.abc.AbstractCookieJar`
 
    .. method:: update_cookies(cookies, response_url=None)
 
-      Update cookies.
+      Update cookies returned by server in ``Set-Cookie`` header.
 
-      :param cookies: cookies to update.
-         The parameter can be of :class:`str`, :class:`dict` or :class:`http.cookies.Morsel`
-         instance representing cookies to send.
+      :param cookies: a :class:`collections.abc.Mapping`
+         (e.g. :class:`dict`, :class:`~http.cookies.SimpleCookie`) or
+         *iterable* of *pairs* with cookies returned by server's
+         response.
 
-      :param str response_url: (optional) URL to store cookies for.
+      :param str response_url: URL of response, ``None`` for *shared
+         cookies*.  Regular cookies are coupled with server's URL and
+         are sent only to this server, shared ones are sent in every
+         client request.
 
    .. method:: filter_cookies(request_url)
 
-      Returns this jar's cookies filtered by their attributes.
+      Return jar's cookies acceptable for URL and available in
+      ``Cookie`` header for sending client requests for given URL.
 
-      :param str request_url: URL to fetch cookies for.
+      :param str response_url: request's URL for which cookies are asked.
 
+      :return: :class:`http.cookies.SimpleCookie` with filtered
+         cookies for given URL.
 
 .. disqus::
+  :title: aiohttp client reference

@@ -21,7 +21,8 @@ __all__ = (web_reqrep.__all__ +
            web_urldispatcher.__all__ +
            web_ws.__all__ +
            ('Application', 'RequestHandler',
-            'RequestHandlerFactory', 'HttpVersion'))
+            'RequestHandlerFactory', 'HttpVersion',
+            'MsgType'))
 
 
 class RequestHandler(ServerHttpProtocol):
@@ -96,7 +97,7 @@ class RequestHandler(ServerHttpProtocol):
         yield from resp.write_eof()
 
         # notify server about keep-alive
-        self.keep_alive(resp_msg.keep_alive())
+        self.keep_alive(resp.keep_alive)
 
         # log access
         if self.access_log:

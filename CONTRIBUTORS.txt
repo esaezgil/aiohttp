@@ -26,6 +26,7 @@ Ben Bader
 Benedikt Reinartz
 Brett Cannon
 Brian C. Lane
+Brian Muller
 Boris Feld
 Carl George
 Chien-Wei Huang
@@ -53,6 +54,7 @@ Gennady Andreyev
 Georges Dubus
 Greg Holt
 Gregory Haynes
+Günther Jena
 Hugo Herter
 Igor Pavlov
 Ingmar Steen
@@ -112,6 +114,7 @@ Stanislav Prokop
 Stephen Granade
 Steven Seguin
 Sviatoslav Bulbakha
+Taha Jahangir
 Taras Voinarovskyi
 Tolga Tezel
 Thomas Grainger
@@ -133,3 +136,4 @@ Yusuke Tsutsumi
 Марк Коренберг
 Семён Марьясин
 Pau Freixes
+Alexey Firsov

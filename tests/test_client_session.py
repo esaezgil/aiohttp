@@ -8,6 +8,7 @@ from unittest import mock
 
 import pytest
 from multidict import CIMultiDict, MultiDict
+from yarl import URL
 
 import aiohttp
 from aiohttp import web
@@ -94,18 +95,20 @@ def test_init_headers_list_of_tuples_with_duplicates(create_session):
 def test_init_cookies_with_simple_dict(create_session):
     session = create_session(cookies={"c1": "cookie1",
                                       "c2": "cookie2"})
-    assert set(session.cookies) == {'c1', 'c2'}
-    assert session.cookies['c1'].value == 'cookie1'
-    assert session.cookies['c2'].value == 'cookie2'
+    cookies = session.cookie_jar.filter_cookies()
+    assert set(cookies) == {'c1', 'c2'}
+    assert cookies['c1'].value == 'cookie1'
+    assert cookies['c2'].value == 'cookie2'
 
 
 def test_init_cookies_with_list_of_tuples(create_session):
     session = create_session(cookies=[("c1", "cookie1"),
                                       ("c2", "cookie2")])
 
-    assert set(session.cookies) == {'c1', 'c2'}
-    assert session.cookies['c1'].value == 'cookie1'
-    assert session.cookies['c2'].value == 'cookie2'
+    cookies = session.cookie_jar.filter_cookies()
+    assert set(cookies) == {'c1', 'c2'}
+    assert cookies['c1'].value == 'cookie1'
+    assert cookies['c2'].value == 'cookie2'
 
 
 def test_merge_headers(create_session):
@@ -276,11 +279,6 @@ def test_connector_loop(loop):
                         str(ctx.value))
 
 
-def test_cookies_are_readonly(session):
-    with pytest.raises(AttributeError):
-        session.cookies = 123
-
-
 def test_detach(session):
     conn = session.connector
     try:
@@ -405,7 +403,7 @@ def test_cookie_jar_usage(create_app_and_client):
 
     # Filtering the cookie jar before sending the request,
     # getting the request URL as only parameter
-    jar.filter_cookies.assert_called_with(req_url)
+    jar.filter_cookies.assert_called_with(URL(req_url))
 
     # Updating the cookie jar with the response cookies
     assert jar.update_cookies.called
@@ -418,3 +416,21 @@ def test_cookie_jar_usage(create_app_and_client):
 def test_session_default_version(loop):
     session = aiohttp.ClientSession(loop=loop)
     assert session.version == aiohttp.HttpVersion11
+
+
+def test_session_loop(loop):
+    session = aiohttp.ClientSession(loop=loop)
+    assert session.loop is loop
+
+
+def test_proxy_str(session, params):
+    with mock.patch("aiohttp.client.ClientSession._request") as patched:
+        session.get("http://test.example.com",
+                    proxy='http://proxy.com',
+                    **params)
+    assert patched.called, "`ClientSession._request` not called"
+    assert list(patched.call_args) == [("GET", "http://test.example.com",),
+                                       dict(
+                                           allow_redirects=True,
+                                           proxy='http://proxy.com',
+                                           **params)]

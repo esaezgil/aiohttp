@@ -11,6 +11,7 @@ from aiohttp.test_utils import make_mocked_coro
 
 base_worker = pytest.importorskip('aiohttp.worker')
 
+
 try:
     import uvloop
 except ImportError:

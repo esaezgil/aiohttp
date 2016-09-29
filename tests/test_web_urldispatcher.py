@@ -70,8 +70,42 @@ def test_access_root_of_static_handler(tmp_dir_path, create_app_and_client,
     assert r.status == status
 
     if data:
+        assert r.headers['Content-Type'] == "text/html; charset=utf-8"
         read_ = (yield from r.read())
         assert read_ == data
+    yield from r.release()
+
+
+@pytest.mark.parametrize('dir_name,filename,data', [
+    ('', 'test file.txt', 'test text'),
+    ('test dir name', 'test dir file .txt', 'test text file folder')
+])
+@asyncio.coroutine
+def test_access_to_the_file_with_spaces(tmp_dir_path, create_app_and_client,
+                                        dir_name, filename, data):
+    """
+    Checks operation of static files with spaces
+    """
+
+    my_dir_path = os.path.join(tmp_dir_path, dir_name)
+
+    if dir_name:
+        os.mkdir(my_dir_path)
+
+    my_file_path = os.path.join(my_dir_path, filename)
+
+    with open(my_file_path, 'w') as fw:
+        fw.write(data)
+
+    app, client = yield from create_app_and_client()
+
+    url = os.path.join('/', dir_name, filename)
+
+    app.router.add_static('/', tmp_dir_path)
+
+    r = yield from client.get(url)
+    assert r.status == 200
+    assert (yield from r.text()) == data
     yield from r.release()
 
 
