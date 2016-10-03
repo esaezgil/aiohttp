@@ -55,3 +55,74 @@ deploy:
     tags: true
     all_branches: true
     python: 3.5
+
+matrix:
+  include:
+  - os: osx
+    # Since OS X doesn't natively support Python, use some workarounds (see
+    # before_install_ for details).
+    language: generic
+    osx_image: xcode7.1 
+    env: PYTHON=3.4.4
+  - os: osx
+    osx_image: xcode7.1 
+    language: generic
+    env: PYTHON=3.5.1
+
+# _`before_install`: Perform the manual steps on OS X to install python3 and
+# activate venv, since Python support is not available, per the list of
+# `unsupported languages on OS X <https://github.com/travis-ci/travis-ci/issues/2320>`_.
+# The following approach is based on a `workaround <https://github.com/travis-ci/travis-ci/issues/2312#issuecomment-195620855>`_.
+# This was modified based on `instructions to install multiple Python versions on OS X <https://gist.github.com/Bouke/11261620>`_.
+# See also the `pyenv docs <https://github.com/yyuu/pyenv/blob/master/README.md>`_.
+before_install: |
+  if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+    brew update
+    # Per the `pyenv homebrew recommendations <https://github.com/yyuu/pyenv/wiki#suggested-build-environment>`_.
+    # brew install openssl readline
+    # See https://docs.travis-ci.com/user/osx-ci-environment/#A-note-on-upgrading-packages.
+    # I didn't do this above because it works and I'm lazy.
+
+    brew install pyenv-virtualenv
+    brew outdated pyenv || brew upgrade pyenv
+    pyenv install $PYTHON
+    # I would expect something like ``pyenv init; pyenv local $PYTHON`` or
+    # ``pyenv shell $PYTHON`` would work, but ``pyenv init`` doesn't seem to
+    # modify the Bash environment. ??? So, I hand-set the variables instead.
+    export PYENV_VERSION=$PYTHON
+    export PATH="/Users/travis/.pyenv/shims:${PATH}"
+    pyenv-virtualenv venv
+    source venv/bin/activate
+    # A manual check that the correct version of Python is running.
+    python --version
+  fi
+cache:
+  directories:
+  - $HOME/.cache/pip
+
+before_cache:
+  - rm -f $HOME/.cache/pip/log/debug.log
+
+install:
+  - brew install enchant
+  - pip install --upgrade pip wheel
+  - pip install --upgrade setuptools
+  - pip install -r requirements-ci.txt
+  - pip install aiodns
+  - pip install codecov
+  - if python -c "import sys; sys.exit(sys.version_info < (3,5))"; then
+        pip install uvloop;
+    fi
+  - pip install sphinxcontrib-spelling
+
+script:
+  - make cov-dev-full
+
+  - if python -c "import sys; sys.exit(sys.version_info < (3,5))"; then
+        make doc;
+        make doc-spelling;
+    fi
+
+after_success:
+  - codecov
+  - ./run_docker.sh
